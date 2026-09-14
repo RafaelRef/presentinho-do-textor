@@ -58,6 +58,28 @@ Resposta esperada: `{"ok":true,"count":18}`
 Isso sorteia os pares e zera qualquer revelação anterior. **Só rode de novo se
 quiser refazer o sorteio do zero** — isso apaga o que já foi sorteado.
 
+### Restrições do sorteio
+
+O Gus Amato só pode tirar — e só pode ser tirado por — alguém do `GRUPO_GUS`
+definido no topo do `server.js` (10 pessoas). O restante do grupo se sorteia
+livremente, e ninguém tira a si mesmo.
+
+O sorteio é por amostragem de rejeição: embaralha até cair um arranjo válido.
+Se as restrições ficarem impossíveis de satisfazer, o endpoint devolve
+`no_valid_draw` em vez de gravar um sorteio inválido. E se algum nome do
+`GRUPO_GUS` não existir no banco (typo), devolve `unknown_names` listando quais
+— assim uma restrição nunca é ignorada em silêncio.
+
+## 4b. Ver quem tirou quem
+
+```bash
+curl -s https://presentinho-do-textor.onrender.com/api/admin/results \
+  -H "x-admin-secret: SEU_ADMIN_SECRET"
+```
+
+Devolve `name`, `receiver`, `revealed` e `revealed_at` de todo mundo. Exige o
+`ADMIN_SECRET` — sem ele, 401.
+
 ## 5. Compartilhar
 
 Agora é só mandar a URL pública do Render pro grupo. Cada pessoa:
