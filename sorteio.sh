@@ -54,6 +54,11 @@ check(not auto, "ninguem tirou a si mesmo", ", ".join(auto))
 doador = next((n for n, r in novo.items() if r == GUS), None)
 check(doador in GRUPO, "quem tirou o Gus esta no grupo dos 10", str(doador))
 check(novo.get(GUS) in GRUPO, "quem o Gus tirou esta no grupo dos 10", str(novo.get(GUS)))
+check(novo.get("Victor Klock") == "Carmona",
+      "Victor Klock tira o Carmona", str(novo.get("Victor Klock")))
+check(novo.get("Rafael Fernandez") != "Bia Brossel",
+      "Rafael Fernandez NAO tira a Bia Brossel")
+
 mutuos = sorted({tuple(sorted((n, r))) for n, r in novo.items() if novo.get(r) == n})
 check(not mutuos, "ninguem tira quem tirou ela (sem pares mutuos)",
       "; ".join(a + " <-> " + b for a, b in mutuos))

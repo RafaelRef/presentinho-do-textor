@@ -38,10 +38,26 @@ const GRUPO_GUS = [
   'Igor André',
 ];
 
+// Pares escolhidos a dedo: a corrente sempre passa por eles nesta ordem.
+const FIXOS = [
+  ['Victor Klock', 'Carmona'],
+];
+
+// Pares vetados.
+const PROIBIDOS = [
+  ['Rafael Fernandez', 'Bia Brossel'],
+];
+
+const ehPar = (lista, g, r) => lista.some(([a, b]) => a === g && b === r);
+
 function allowed(giver, receiver, anterior) {
   if (giver === receiver) return false;
-  // Refazer o sorteio tem que dar gente nova pra todo mundo.
-  if (anterior && anterior[giver] === receiver) return false;
+  if (ehPar(PROIBIDOS, giver, receiver)) return false;
+  // Um par fixo foi escolhido de proposito, entao nao cai na regra de nao
+  // repetir o sorteio anterior — foi justamente de la que ele veio.
+  if (!ehPar(FIXOS, giver, receiver)) {
+    if (anterior && anterior[giver] === receiver) return false;
+  }
   if (receiver === GUS) return GRUPO_GUS.includes(giver);
   if (giver === GUS) return GRUPO_GUS.includes(receiver);
   return true;
@@ -51,8 +67,29 @@ function allowed(giver, receiver, anterior) {
 // todo mundo. Assim ninguem tira a si mesmo e ninguem tira quem tirou ela —
 // isso exigiria um ciclo de 2, que nao existe numa corrente de 18. Tambem nao
 // se formam panelinhas fechadas de 3 ou 4.
+// Cada par fixo vira um bloco colado, e a corrente embaralha os blocos. Assim
+// o par sai sempre junto e na ordem certa, sem depender de sorte.
+function montarBlocos(names) {
+  const prox = new Map(FIXOS);
+  const temAntecessor = new Set(FIXOS.map(([, r]) => r));
+  const blocos = [];
+  for (const n of names) {
+    if (temAntecessor.has(n)) continue; // entra junto de quem vem antes dele
+    const bloco = [n];
+    let cur = n;
+    while (prox.has(cur)) {
+      cur = prox.get(cur);
+      if (bloco.includes(cur)) break; // fixos formando ciclo fechado: para
+      bloco.push(cur);
+    }
+    blocos.push(bloco);
+  }
+  return blocos;
+}
+
 function cyclicMapping(names) {
-  const ordem = shuffle(names);
+  const ordem = shuffle(montarBlocos(names)).flat();
+  if (ordem.length !== names.length) return null; // fixos inconsistentes
   const mapping = {};
   ordem.forEach((n, i) => { mapping[n] = ordem[(i + 1) % ordem.length]; });
   return mapping;
@@ -66,7 +103,7 @@ function cyclicMapping(names) {
 function generateDraw(names, anterior) {
   for (let attempt = 0; attempt < 5000; attempt++) {
     const mapping = cyclicMapping(names);
-    if (names.every((giver) => allowed(giver, mapping[giver], anterior))) {
+    if (mapping && names.every((giver) => allowed(giver, mapping[giver], anterior))) {
       return mapping;
     }
   }
@@ -149,7 +186,8 @@ app.post('/api/admin/draw', async (req, res) => {
 
   // Os nomes das restricoes precisam existir de verdade no banco. Sem isso, um
   // typo em GRUPO_GUS passaria batido e o sorteio sairia sem a restricao.
-  const desconhecidos = [GUS, ...GRUPO_GUS].filter((n) => !names.includes(n));
+  const citados = [GUS, ...GRUPO_GUS, ...FIXOS.flat(), ...PROIBIDOS.flat()];
+  const desconhecidos = citados.filter((n) => !names.includes(n));
   if (desconhecidos.length > 0) {
     return res.status(500).json({ error: 'unknown_names', names: desconhecidos });
   }
