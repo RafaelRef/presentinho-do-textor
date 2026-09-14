@@ -38,21 +38,24 @@ const GRUPO_GUS = [
   'Igor André',
 ];
 
-function allowed(giver, receiver) {
+function allowed(giver, receiver, anterior) {
   if (giver === receiver) return false;
+  // Refazer o sorteio tem que dar gente nova pra todo mundo.
+  if (anterior && anterior[giver] === receiver) return false;
   if (receiver === GUS) return GRUPO_GUS.includes(giver);
   if (giver === GUS) return GRUPO_GUS.includes(receiver);
   return true;
 }
 
 // Sorteia por rejeicao: embaralha ate cair um arranjo que respeite allowed().
-// Cada tentativa tem ~35% de chance de passar, entao 2000 tentativas tornam a
-// falha impossivel na pratica. Se as restricoes ficarem impossiveis um dia,
+// Com a restricao do Gus mais a de nao repetir o sorteio anterior, cada
+// tentativa passa ~12% das vezes — 5000 tentativas tornam a falha impossivel
+// na pratica. Se as restricoes ficarem impossiveis um dia,
 // devolve null em vez de gravar um sorteio invalido no banco.
-function generateDraw(names) {
-  for (let attempt = 0; attempt < 2000; attempt++) {
+function generateDraw(names, anterior) {
+  for (let attempt = 0; attempt < 5000; attempt++) {
     const receivers = shuffle(names);
-    if (names.every((giver, i) => allowed(giver, receivers[i]))) {
+    if (names.every((giver, i) => allowed(giver, receivers[i], anterior))) {
       const mapping = {};
       names.forEach((giver, i) => { mapping[giver] = receivers[i]; });
       return mapping;
@@ -126,10 +129,14 @@ app.post('/api/admin/draw', async (req, res) => {
     return res.status(401).json({ error: 'unauthorized' });
   }
 
-  const { data, error } = await supabase.from('participants').select('name');
+  const { data, error } = await supabase.from('participants').select('name, receiver');
   if (error) return res.status(500).json({ error: 'server_error' });
 
   const names = data.map((p) => p.name);
+
+  // Sorteio atual, para nao repetir. No primeiro sorteio fica vazio.
+  const anterior = {};
+  data.forEach((p) => { if (p.receiver) anterior[p.name] = p.receiver; });
 
   // Os nomes das restricoes precisam existir de verdade no banco. Sem isso, um
   // typo em GRUPO_GUS passaria batido e o sorteio sairia sem a restricao.
@@ -138,7 +145,7 @@ app.post('/api/admin/draw', async (req, res) => {
     return res.status(500).json({ error: 'unknown_names', names: desconhecidos });
   }
 
-  const mapping = generateDraw(names);
+  const mapping = generateDraw(names, anterior);
   if (!mapping) return res.status(500).json({ error: 'no_valid_draw' });
 
   for (const giver of names) {
@@ -150,6 +157,12 @@ app.post('/api/admin/draw', async (req, res) => {
   }
 
   res.json({ ok: true, count: names.length });
+});
+
+// Diz qual commit esta rodando. Serve para confirmar que um deploy subiu
+// antes de mexer no sorteio. Nao exige segredo: e so um SHA.
+app.get('/api/version', (req, res) => {
+  res.json({ commit: (process.env.RENDER_GIT_COMMIT || 'local').slice(0, 7) });
 });
 
 // Admin only: quem tirou quem. Nunca exposto sem o ADMIN_SECRET.
