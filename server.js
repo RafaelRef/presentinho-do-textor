@@ -47,17 +47,26 @@ function allowed(giver, receiver, anterior) {
   return true;
 }
 
-// Sorteia por rejeicao: embaralha ate cair um arranjo que respeite allowed().
+// Monta um ciclo unico: A -> B -> C -> ... -> A, uma corrente so passando por
+// todo mundo. Assim ninguem tira a si mesmo e ninguem tira quem tirou ela —
+// isso exigiria um ciclo de 2, que nao existe numa corrente de 18. Tambem nao
+// se formam panelinhas fechadas de 3 ou 4.
+function cyclicMapping(names) {
+  const ordem = shuffle(names);
+  const mapping = {};
+  ordem.forEach((n, i) => { mapping[n] = ordem[(i + 1) % ordem.length]; });
+  return mapping;
+}
+
+// Sorteia por rejeicao: gera correntes ate cair uma que respeite allowed().
 // Com a restricao do Gus mais a de nao repetir o sorteio anterior, cada
-// tentativa passa ~12% das vezes — 5000 tentativas tornam a falha impossivel
-// na pratica. Se as restricoes ficarem impossiveis um dia,
-// devolve null em vez de gravar um sorteio invalido no banco.
+// tentativa passa ~11% das vezes — 5000 tentativas tornam a falha impossivel
+// na pratica. Se as restricoes ficarem impossiveis um dia, devolve null em vez
+// de gravar um sorteio invalido no banco.
 function generateDraw(names, anterior) {
   for (let attempt = 0; attempt < 5000; attempt++) {
-    const receivers = shuffle(names);
-    if (names.every((giver, i) => allowed(giver, receivers[i], anterior))) {
-      const mapping = {};
-      names.forEach((giver, i) => { mapping[giver] = receivers[i]; });
+    const mapping = cyclicMapping(names);
+    if (names.every((giver) => allowed(giver, mapping[giver], anterior))) {
       return mapping;
     }
   }

@@ -54,6 +54,18 @@ check(not auto, "ninguem tirou a si mesmo", ", ".join(auto))
 doador = next((n for n, r in novo.items() if r == GUS), None)
 check(doador in GRUPO, "quem tirou o Gus esta no grupo dos 10", str(doador))
 check(novo.get(GUS) in GRUPO, "quem o Gus tirou esta no grupo dos 10", str(novo.get(GUS)))
+mutuos = sorted({tuple(sorted((n, r))) for n, r in novo.items() if novo.get(r) == n})
+check(not mutuos, "ninguem tira quem tirou ela (sem pares mutuos)",
+      "; ".join(a + " <-> " + b for a, b in mutuos))
+
+# a corrente tem que passar por todo mundo antes de fechar
+primeiro = next(iter(novo))
+passos, cur = 1, novo[primeiro]
+while cur != primeiro and passos <= len(novo):
+    cur = novo[cur]; passos += 1
+check(passos == len(novo), "o sorteio e uma corrente unica passando por todos",
+      "fechou em %d de %d" % (passos, len(novo)))
+
 if antes and any(antes.values()):
     rep = [n for n in novo if antes.get(n) and antes[n] == novo[n]]
     check(not rep, "ninguem repetiu quem tinha antes", ", ".join(rep))
