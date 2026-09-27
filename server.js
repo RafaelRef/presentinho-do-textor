@@ -114,7 +114,7 @@ function generateDraw(names, anterior) {
 app.get('/api/participants', async (req, res) => {
   const { data, error } = await supabase
     .from('participants')
-    .select('name, revealed')
+    .select('name, revealed, ja_viu')
     .order('name');
 
   if (error) return res.status(500).json({ error: 'server_error' });
@@ -123,12 +123,14 @@ app.get('/api/participants', async (req, res) => {
 
 // Public: aggregate progress counter.
 app.get('/api/progress', async (req, res) => {
-  const { data, error } = await supabase.from('participants').select('revealed');
+  const { data, error } = await supabase.from('participants').select('revealed, ja_viu');
   if (error) return res.status(500).json({ error: 'server_error' });
 
   const total = data.length;
   const revealed = data.filter((p) => p.revealed).length;
-  res.json({ total, revealed, remaining: total - revealed });
+  // ja_viram nunca volta atras: sobrevive ao /api/admin/reabrir.
+  const jaViram = data.filter((p) => p.ja_viu).length;
+  res.json({ total, revealed, remaining: total - revealed, jaViram, nuncaViram: total - jaViram });
 });
 
 // Reveal a participant's match — validates PIN server-side, marks as revealed,
@@ -153,7 +155,7 @@ app.post('/api/reveal', async (req, res) => {
   // two near-simultaneous requests both passing the check above).
   const { data: updated, error: updateError } = await supabase
     .from('participants')
-    .update({ revealed: true, revealed_at: new Date().toISOString() })
+    .update({ revealed: true, ja_viu: true, revealed_at: new Date().toISOString() })
     .eq('name', name)
     .eq('revealed', false)
     .select();
@@ -198,7 +200,7 @@ app.post('/api/admin/draw', async (req, res) => {
   for (const giver of names) {
     const { error: updateError } = await supabase
       .from('participants')
-      .update({ receiver: mapping[giver], revealed: false, revealed_at: null })
+      .update({ receiver: mapping[giver], revealed: false, ja_viu: false, revealed_at: null })
       .eq('name', giver);
     if (updateError) return res.status(500).json({ error: 'server_error' });
   }
@@ -248,7 +250,7 @@ app.get('/api/admin/results', async (req, res) => {
 
   const { data, error } = await supabase
     .from('participants')
-    .select('name, receiver, revealed, revealed_at')
+    .select('name, receiver, revealed, ja_viu, revealed_at')
     .order('name');
 
   if (error) return res.status(500).json({ error: 'server_error' });

@@ -196,6 +196,15 @@
   .name-btn:hover{ border-color: var(--gold-bright); color: var(--metal-100); background: var(--gold-dim); }
   .name-btn.selected{ border-color: var(--gold-bright); background: var(--gold-dim); color: var(--metal-100); }
   .name-btn.locked{ opacity: 0.32; cursor: default; }
+  /* Marca permanente: ja olhou o nome pelo menos uma vez. Sobrevive ao
+     reabrir, entao continua aparecendo mesmo com o botao desbloqueado. */
+  .name-btn.ja-viu{ border-color: rgba(212,175,55,0.45); }
+  .name-btn.ja-viu::after{
+    content: '✓';
+    margin-left: 7px;
+    color: var(--gold-bright);
+    font-weight: 700;
+  }
   .name-btn.locked:hover{ border-color: var(--line); background: rgba(255,255,255,0.02); color: var(--metal-300); }
 
   .actions{ margin-top: 22px; display: flex; gap: 10px; align-items: center; }
@@ -324,7 +333,7 @@
   <div class="progress-strip">
     <div class="progress-stat">
       <div class="progress-number" id="remainingNumber">—</div>
-      <div class="progress-label">faltam sortear</div>
+      <div class="progress-label">ainda não viram</div>
     </div>
     <div class="progress-bar-wrap">
       <div class="progress-bar-track"><div class="progress-bar-fill" id="progressFill"></div></div>
@@ -400,9 +409,13 @@ function showScreen(id){
 async function loadProgress(){
   const { ok, data } = await fetchJSON('/api/progress');
   if(!ok || !data) return;
-  document.getElementById('remainingNumber').textContent = data.remaining;
-  document.getElementById('progressFill').style.width = ((data.revealed / data.total) * 100) + '%';
-  document.getElementById('progressCaption').innerHTML = '<b>' + data.revealed + '</b> de ' + data.total + ' já revelaram';
+  // jaViram nao volta atras quando o sorteio e reaberto; revealed sim.
+  const viram = data.jaViram ?? data.revealed;
+  const faltam = data.nuncaViram ?? data.remaining;
+  document.getElementById('remainingNumber').textContent = faltam;
+  document.getElementById('progressFill').style.width = ((viram / data.total) * 100) + '%';
+  document.getElementById('progressCaption').innerHTML =
+    '<b>' + viram + '</b> de ' + data.total + ' já viram o nome (✓ na lista)';
 }
 
 async function loadParticipants(){
@@ -419,6 +432,8 @@ async function loadParticipants(){
     btn.className = 'name-btn';
     btn.textContent = p.name;
     if(p.revealed) btn.classList.add('locked');
+    if(p.ja_viu) btn.classList.add('ja-viu');
+    btn.title = p.ja_viu ? 'Já viu o nome' : 'Ainda não viu o nome';
     btn.addEventListener('click', () => {
       selectedName = p.name;
       document.querySelectorAll('.name-btn').forEach(b => b.classList.remove('selected'));

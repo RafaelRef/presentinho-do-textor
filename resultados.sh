@@ -18,6 +18,7 @@ if isinstance(d, dict):
 
 m = {p["name"]: p["receiver"] for p in d}
 viu = {p["name"] for p in d if p["revealed"]}
+javiu = {p["name"]: p.get("ja_viu") for p in d}
 if not all(m.values()):
     print("Sorteio ainda nao foi rodado."); sys.exit(1)
 
@@ -30,10 +31,11 @@ while cur != inicio and len(ordem) <= len(m):
 w = max(len(n) for n in m)
 print("A CORRENTE — cada um presenteia o proximo da lista\n")
 for i, n in enumerate(ordem, 1):
-    print("  %2d. %s  %s" % (i, n.ljust(w), "(ja viu)" if n in viu else ""))
+    marca = "ja viu" if javiu.get(n) else "AINDA NAO VIU"
+    print("  %2d. %s  %s" % (i, n.ljust(w), marca))
 print("      %s  e fecha de volta em %s" % (" " * (w + 1), inicio))
 
-print("\n%d de %d na corrente | %d ja revelaram" % (len(ordem), len(m), len(viu)))
+print("\n%d de %d na corrente | %d ja viram o nome | %d nunca viram" % (len(ordem), len(m), sum(1 for v in javiu.values() if v), sum(1 for v in javiu.values() if not v)))
 if len(ordem) != len(m):
     print("ATENCAO: a corrente nao passa por todo mundo — ha ciclos separados.")
     sys.exit(2)
