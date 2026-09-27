@@ -110,11 +110,22 @@ function generateDraw(names, anterior) {
   return null;
 }
 
+// A coluna ja_viu pode ainda nao existir (migracao pendente). Detecta uma vez
+// e guarda, para o app funcionar antes e depois da migracao em vez de cair.
+let colunaJaViu = null;
+async function temJaViu() {
+  if (colunaJaViu === null) {
+    const { error } = await supabase.from('participants').select('ja_viu').limit(1);
+    colunaJaViu = !error;
+  }
+  return colunaJaViu;
+}
+
 // Public: list of names + whether each has already revealed (no PINs, no receivers).
 app.get('/api/participants', async (req, res) => {
   const { data, error } = await supabase
     .from('participants')
-    .select('name, revealed, ja_viu')
+    .select((await temJaViu()) ? 'name, revealed, ja_viu' : 'name, revealed')
     .order('name');
 
   if (error) return res.status(500).json({ error: 'server_error' });
@@ -123,12 +134,16 @@ app.get('/api/participants', async (req, res) => {
 
 // Public: aggregate progress counter.
 app.get('/api/progress', async (req, res) => {
-  const { data, error } = await supabase.from('participants').select('revealed, ja_viu');
+  const comJaViu = await temJaViu();
+  const { data, error } = await supabase
+    .from('participants')
+    .select(comJaViu ? 'revealed, ja_viu' : 'revealed');
   if (error) return res.status(500).json({ error: 'server_error' });
 
   const total = data.length;
   const revealed = data.filter((p) => p.revealed).length;
   // ja_viram nunca volta atras: sobrevive ao /api/admin/reabrir.
+  if (!comJaViu) return res.json({ total, revealed, remaining: total - revealed });
   const jaViram = data.filter((p) => p.ja_viu).length;
   res.json({ total, revealed, remaining: total - revealed, jaViram, nuncaViram: total - jaViram });
 });
@@ -155,7 +170,9 @@ app.post('/api/reveal', async (req, res) => {
   // two near-simultaneous requests both passing the check above).
   const { data: updated, error: updateError } = await supabase
     .from('participants')
-    .update({ revealed: true, ja_viu: true, revealed_at: new Date().toISOString() })
+    .update((await temJaViu())
+      ? { revealed: true, ja_viu: true, revealed_at: new Date().toISOString() }
+      : { revealed: true, revealed_at: new Date().toISOString() })
     .eq('name', name)
     .eq('revealed', false)
     .select();
@@ -200,7 +217,9 @@ app.post('/api/admin/draw', async (req, res) => {
   for (const giver of names) {
     const { error: updateError } = await supabase
       .from('participants')
-      .update({ receiver: mapping[giver], revealed: false, ja_viu: false, revealed_at: null })
+      .update((await temJaViu())
+        ? { receiver: mapping[giver], revealed: false, ja_viu: false, revealed_at: null }
+        : { receiver: mapping[giver], revealed: false, revealed_at: null })
       .eq('name', giver);
     if (updateError) return res.status(500).json({ error: 'server_error' });
   }
@@ -250,7 +269,9 @@ app.get('/api/admin/results', async (req, res) => {
 
   const { data, error } = await supabase
     .from('participants')
-    .select('name, receiver, revealed, ja_viu, revealed_at')
+    .select((await temJaViu())
+      ? 'name, receiver, revealed, ja_viu, revealed_at'
+      : 'name, receiver, revealed, revealed_at')
     .order('name');
 
   if (error) return res.status(500).json({ error: 'server_error' });
