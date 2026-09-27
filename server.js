@@ -206,6 +206,33 @@ app.post('/api/admin/draw', async (req, res) => {
   res.json({ ok: true, count: names.length });
 });
 
+// Admin only: libera todo mundo para ver DE NOVO o mesmo nome. Nao sorteia
+// nada — mexe so no flag de quem ja viu, os receivers ficam como estao.
+app.post('/api/admin/reabrir', async (req, res) => {
+  const secret = req.headers['x-admin-secret'];
+  if (!secret || secret !== process.env.ADMIN_SECRET) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+
+  // Sem sorteio gravado nao ha o que reabrir.
+  const { data: atual, error: readError } = await supabase
+    .from('participants')
+    .select('name, receiver');
+  if (readError) return res.status(500).json({ error: 'server_error' });
+  if (atual.some((p) => !p.receiver)) {
+    return res.status(409).json({ error: 'sem_sorteio' });
+  }
+
+  const { data, error } = await supabase
+    .from('participants')
+    .update({ revealed: false, revealed_at: null })
+    .not('name', 'is', null)
+    .select('name');
+
+  if (error) return res.status(500).json({ error: 'server_error' });
+  res.json({ ok: true, liberados: data.length });
+});
+
 // Diz qual commit esta rodando. Serve para confirmar que um deploy subiu
 // antes de mexer no sorteio. Nao exige segredo: e so um SHA.
 app.get('/api/version', (req, res) => {
