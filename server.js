@@ -112,12 +112,14 @@ function generateDraw(names, anterior) {
 
 // A coluna ja_viu pode ainda nao existir (migracao pendente). Detecta uma vez
 // e guarda, para o app funcionar antes e depois da migracao em vez de cair.
-let colunaJaViu = null;
+// So guarda o resultado positivo: a coluna pode nascer a qualquer momento
+// (quando alguem roda a migracao) mas, uma vez criada, nao desaparece.
+// Guardar o "nao existe" deixaria o servidor cego ate o proximo restart.
+let colunaJaViu = false;
 async function temJaViu() {
-  if (colunaJaViu === null) {
-    const { error } = await supabase.from('participants').select('ja_viu').limit(1);
-    colunaJaViu = !error;
-  }
+  if (colunaJaViu) return true;
+  const { error } = await supabase.from('participants').select('ja_viu').limit(1);
+  colunaJaViu = !error;
   return colunaJaViu;
 }
 
