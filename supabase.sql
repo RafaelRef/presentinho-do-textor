@@ -9,6 +9,11 @@ create table if not exists participants (
   revealed_at timestamptz
 );
 
+-- Tranca a tabela: sem policies, anon e authenticated nao leem nada.
+-- A service_role (que o server.js usa) bypassa RLS e continua funcionando.
+-- Sem isso, qualquer um com a anon key do projeto baixa o sorteio inteiro.
+alter table participants enable row level security;
+
 -- Participantes com o PIN já criptografado (bcrypt).
 -- O PIN em texto puro nunca fica salvo no banco.
 insert into participants (name, pin_hash) values
